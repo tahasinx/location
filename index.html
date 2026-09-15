@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Location</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Your location</h1>
+      <p>Allow access to place a pin at your exact coordinates.</p>
+    </header>
+
+    <div class="actions">
+      <button type="button" class="btn" id="refreshBtn">Allow location</button>
+      <button type="button" class="btn secondary" id="copyBtn" disabled>Copy</button>
+    </div>
+    <p class="message" id="message" hidden></p>
+
+    <div class="result" id="result" hidden>
+      <div class="coords">
+        <div>
+          <span>Latitude</span>
+          <strong id="lat">—</strong>
+        </div>
+        <div>
+          <span>Longitude</span>
+          <strong id="lng">—</strong>
+        </div>
+      </div>
+      <iframe
+        id="map"
+        title="Google Maps satellite view"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        allowfullscreen
+      ></iframe>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
