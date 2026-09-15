@@ -1,14 +1,28 @@
 const refreshBtn = document.getElementById("refreshBtn");
 const copyBtn = document.getElementById("copyBtn");
 const messageEl = document.getElementById("message");
+const blockedPanel = document.getElementById("blockedPanel");
 const resultEl = document.getElementById("result");
 const latEl = document.getElementById("lat");
 const lngEl = document.getElementById("lng");
+const accEl = document.getElementById("acc");
 const mapFrame = document.getElementById("map");
+
+const GEO_OPTIONS = {
+  enableHighAccuracy: true,
+  timeout: 45000,
+  maximumAge: 0
+};
+
+const TARGET_ACCURACY_M = 12;
+const MAX_WAIT_MS = 25000;
 
 let lastCoords = null;
 let locating = false;
 let copyResetTimer;
+let watchId = null;
+let bestPosition = null;
+let settleTimer = null;
 
 function showMessage(text, ok = false) {
   messageEl.hidden = false;
@@ -22,8 +36,22 @@ function hideMessage() {
   messageEl.classList.remove("ok");
 }
 
+function showBlocked() {
+  blockedPanel.hidden = false;
+}
+
+function hideBlocked() {
+  blockedPanel.hidden = true;
+}
+
 function formatCoord(value) {
-  return Number(value).toFixed(6);
+  return Number(value).toFixed(7);
+}
+
+function formatAccuracy(meters) {
+  if (!Number.isFinite(meters)) return "GPS precise";
+  if (meters < 1) return `± ${(meters * 100).toFixed(0)} cm`;
+  return `± ${meters < 10 ? meters.toFixed(1) : Math.round(meters)} m`;
 }
 
 function copyText() {
@@ -31,41 +59,107 @@ function copyText() {
   return `latitude: ${formatCoord(lastCoords.lat)}, longitude: ${formatCoord(lastCoords.lng)}`;
 }
 
-function placePin(lat, lng) {
-  const q = `${lat},${lng}`;
-  mapFrame.src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=k&z=18&ie=UTF8&output=embed`;
+function mapZoom(accuracy) {
+  if (accuracy <= 10) return 21;
+  if (accuracy <= 25) return 20;
+  if (accuracy <= 50) return 19;
+  return 18;
 }
 
-function onSuccess(position) {
-  const { latitude, longitude } = position.coords;
+function placePin(lat, lng, accuracy) {
+  const q = `${lat},${lng}`;
+  const z = mapZoom(accuracy);
+  mapFrame.src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=k&z=${z}&ie=UTF8&output=embed`;
+}
 
+function setFinding() {
+  locating = true;
+  refreshBtn.disabled = true;
+  refreshBtn.classList.add("busy");
+  refreshBtn.textContent = "Finding you…";
+}
+
+function setButtonIdle(label) {
   locating = false;
-  hideMessage();
   refreshBtn.classList.remove("busy");
   refreshBtn.disabled = false;
-  refreshBtn.textContent = "Refresh";
+  refreshBtn.textContent = label;
+}
 
-  lastCoords = { lat: latitude, lng: longitude };
+function stopWatch() {
+  if (watchId != null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  clearTimeout(settleTimer);
+  settleTimer = null;
+}
+
+function applyReading(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+
+  lastCoords = { lat: latitude, lng: longitude, accuracy };
   latEl.textContent = formatCoord(latitude);
   lngEl.textContent = formatCoord(longitude);
+  accEl.textContent = formatAccuracy(accuracy);
   copyBtn.disabled = false;
   resultEl.hidden = false;
-  placePin(latitude, longitude);
+}
+
+function finishSuccess(position) {
+  stopWatch();
+  hideMessage();
+  hideBlocked();
+  applyReading(position);
+  placePin(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+  setButtonIdle("Refresh");
+}
+
+function onWatch(position) {
+  const accuracy = position.coords.accuracy;
+  const isBetter = !bestPosition || accuracy < bestPosition.coords.accuracy;
+
+  if (!isBetter) return;
+
+  const firstFix = !bestPosition;
+  bestPosition = position;
+  applyReading(position);
+
+  if (firstFix) {
+    placePin(position.coords.latitude, position.coords.longitude, accuracy);
+  }
+
+  if (accuracy <= TARGET_ACCURACY_M) {
+    finishSuccess(bestPosition);
+  }
 }
 
 function onError(error) {
-  locating = false;
-  refreshBtn.classList.remove("busy");
-  refreshBtn.disabled = false;
-  refreshBtn.textContent = "Refresh";
+  if (error?.code === 1) {
+    stopWatch();
+    setButtonIdle("Refresh");
+    showBlocked();
+    showMessage("Location was denied. Press Refresh to try again, or set Location to Allow in the address bar.");
+    return;
+  }
 
-  const messages = {
-    1: "Location was denied. Press Refresh to allow it again, or set Location to Allow in the lock icon next to the URL.",
-    2: "Position unavailable. Press Refresh to try again, ideally outdoors with GPS on.",
-    3: "Request timed out. Press Refresh to try again."
-  };
+  // Timeouts can fire while GPS is still locking in. Keep waiting for a better fix.
+  if (error?.code === 3 && locating) {
+    return;
+  }
 
-  showMessage(messages[error.code] || "Could not read your location. Press Refresh to try again.");
+  if (bestPosition) {
+    finishSuccess(bestPosition);
+    return;
+  }
+
+  stopWatch();
+  setButtonIdle("Refresh");
+  showMessage(
+    error?.code === 2
+      ? "Position unavailable. Press Refresh to try again, ideally outdoors with GPS on."
+      : "High-accuracy GPS timed out. Press Refresh to try again outdoors."
+  );
 }
 
 function requestLocation() {
@@ -81,17 +175,24 @@ function requestLocation() {
     return;
   }
 
-  locating = true;
+  stopWatch();
+  bestPosition = null;
   hideMessage();
-  refreshBtn.disabled = true;
-  refreshBtn.classList.add("busy");
-  refreshBtn.textContent = "Finding you…";
+  hideBlocked();
+  setFinding();
 
-  navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-    enableHighAccuracy: true,
-    timeout: 20000,
-    maximumAge: 0
-  });
+  watchId = navigator.geolocation.watchPosition(onWatch, onError, GEO_OPTIONS);
+
+  settleTimer = setTimeout(() => {
+    if (bestPosition) {
+      finishSuccess(bestPosition);
+      return;
+    }
+
+    stopWatch();
+    setButtonIdle("Refresh");
+    showMessage("High-accuracy GPS timed out. Press Refresh to try again outdoors.");
+  }, MAX_WAIT_MS);
 }
 
 async function copyCoords() {
@@ -122,3 +223,13 @@ async function copyCoords() {
 
 refreshBtn.addEventListener("click", requestLocation);
 copyBtn.addEventListener("click", copyCoords);
+
+if (navigator.permissions?.query) {
+  navigator.permissions.query({ name: "geolocation" }).then((status) => {
+    status.onchange = () => {
+      if (status.state === "granted" && !lastCoords) {
+        requestLocation();
+      }
+    };
+  }).catch(() => {});
+}

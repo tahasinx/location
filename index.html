@@ -21,6 +21,14 @@
       <button type="button" class="btn secondary" id="copyBtn" disabled>Copy</button>
     </div>
     <p class="message" id="message" hidden></p>
+    <aside class="blocked" id="blockedPanel" hidden>
+      <p>Location is blocked for this site, so the browser will not show the popup again until you reset it.</p>
+      <ol>
+        <li>Click the lock or location icon in the address bar</li>
+        <li>Set Location to <strong>Allow</strong></li>
+        <li>Press <strong>Refresh</strong></li>
+      </ol>
+    </aside>
 
     <div class="result" id="result" hidden>
       <div class="coords">
@@ -31,6 +39,10 @@
         <div>
           <span>Longitude</span>
           <strong id="lng">—</strong>
+        </div>
+        <div>
+          <span>Accuracy</span>
+          <strong id="acc">—</strong>
         </div>
       </div>
       <iframe
