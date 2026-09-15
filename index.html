@@ -17,11 +17,11 @@
     </header>
 
     <div class="actions">
-      <button type="button" class="btn" id="refreshBtn">Allow location</button>
+      <button type="button" class="btn" id="refreshBtn" aria-busy="false">Allow location</button>
       <button type="button" class="btn secondary" id="copyBtn" disabled>Copy</button>
     </div>
-    <p class="message" id="message" hidden></p>
-    <aside class="blocked" id="blockedPanel" hidden>
+    <p class="message" id="message" role="status" aria-live="polite" hidden></p>
+    <aside class="blocked" id="blockedPanel" role="alert" hidden>
       <p>Location is blocked for this site, so the browser will not show the popup again until you reset it.</p>
       <ol>
         <li>Click the lock or location icon in the address bar</li>
@@ -48,7 +48,7 @@
       <iframe
         id="map"
         title="Google Maps satellite view"
-        loading="lazy"
+        src="about:blank"
         referrerpolicy="no-referrer-when-downgrade"
         allowfullscreen
       ></iframe>

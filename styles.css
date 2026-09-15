@@ -85,8 +85,9 @@ header p {
 }
 
 .btn.busy {
-  opacity: 0.7;
+  opacity: 0.85;
   cursor: wait;
+  min-width: 12.5rem;
 }
 
 .message.ok {
@@ -143,11 +144,18 @@ header p {
   margin-bottom: 4px;
 }
 
+.btn:focus-visible,
+#map:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .coords strong {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 1.05rem;
   font-weight: 500;
   letter-spacing: -0.02em;
+  user-select: all;
 }
 
 #map {
